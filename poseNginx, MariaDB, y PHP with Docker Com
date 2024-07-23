@@ -1,0 +1,131 @@
+# previamente hay que tener instalado el docker y docker compose
+#seguiremos esta ruta:
+alex@alex-VirtualBox:~/lemp$ tree .
+.
+├── docker-compose.yml
+├── nginx-conf
+│   └── nginx.conf
+├── php-dockerfile
+└── php-files
+    └── index.php
+2 directories, 4 files
+
+# ------------------------------------------------------------------------------
+
+# configuración del docker-compose.yml
+version: '3.8'
+
+# Services
+services:
+
+    # PHP Service
+    php:
+        build:
+            context: .
+            dockerfile: php-dockerfile
+        volumes:
+            - './php-files:/var/www/html'
+        depends_on:
+            - mariadb
+
+    # Nginx Service
+    nginx:
+        image: nginx:latest
+        ports:
+            - 80:80
+        links:
+            - 'php'
+        volumes:
+            - './php-files:/var/www/html'
+            - './nginx-conf:/etc/nginx/conf.d'
+        depends_on:
+            - php
+
+    # MariaDB Service
+    mariadb:
+        image: mariadb:10.9
+        environment:
+            MYSQL_ROOT_PASSWORD: 1234
+        volumes:
+            - mysqldata:/var/lib/mysql
+
+    # phpMyAdmin Service
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+            - 8080:80
+        environment:
+            PMA_HOST: mariadb
+        depends_on:
+            - mariadb
+
+# Volumes
+volumes:
+
+  mysqldata:
+
+# --------------------------------------------------------------------------------
+
+# dentro del archivo php-dockerfile ponemos lo siguiente:
+
+FROM php:8.1-fpm
+
+# Installing dependencies for the PHP modules
+RUN apt-get update && \
+    apt-get install -y zip libzip-dev libpng-dev
+
+# Installing additional PHP modules
+RUN docker-php-ext-install mysqli pdo pdo_mysql gd zip
+
+# ---------------------------------------------------------------------
+ vim php-files/index.php
+# dentro de este archivo pegaremos lo siguiente:
+<?php phpinfo(); ?>
+
+# --------------------------------------------------------------
+vim nginx-conf/nginx.conf
+# dentro de este archivo pegaremos lo siguiente:
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    server_name localhost;
+
+    root /var/www/html;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~* \.php$ {
+        fastcgi_pass php:9000;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_NAME $fastcgi_script_name;
+    }
+}
+
+# ------------------------------------------------------
+
+docker-compose up -d
+
+# verificar que se hayan instalado e iniciado lo siguiente:
+                  Creating lemp_mariadb_1 ... done
+                  Creating lemp_phpmyadmin_1 ... done
+                  Creating lemp_php_1        ... done
+                  Creating lemp_nginx_1      ... done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
